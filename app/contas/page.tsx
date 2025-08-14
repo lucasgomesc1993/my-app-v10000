@@ -68,7 +68,7 @@ export default function ContasPage() {
         )
       );
 
-      // TODO: Implementar API para atualizar favorito
+      // TODO: Implementar API para atualizar favorito quando disponível
       // await api.toggleFavoriteConta(id);
     } catch (error) {
       console.error('Erro ao alterar favorito:', error);

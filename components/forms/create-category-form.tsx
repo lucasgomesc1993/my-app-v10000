@@ -3,8 +3,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useState } from "react";
-import { Save } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, Loader2 } from "lucide-react";
+import { api } from "@/services/api";
 
 import { Button } from "@/components/button";
 import { Input } from "@/components/ui/input";
@@ -13,55 +14,115 @@ import { toast } from "sonner";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { IconPicker } from "@/components/ui/icon-picker";
 import { cn } from "@/lib/utils";
+import type { Categoria } from "@/types/index";
 
 const FormSchema = z.object({
   nome: z.string().min(2, {
     message: "O nome da categoria deve ter pelo menos 2 caracteres.",
   }),
-  tipo: z.enum(["receita", "despesa", "transferencia"]),
+  tipo: z.enum(["receita", "despesa"]),
   cor: z.string().regex(/^#[0-9a-fA-F]{6}$/, {
     message: "Cor inválida.",
   }),
   icone: z.string().min(1, {
     message: "Por favor, selecione um ícone.",
   }),
+  descricao: z.string().optional(),
 });
 
 type CreateCategoryFormProps = {
   onSuccess?: () => void;
+  categoryToEdit?: Categoria;
 };
 
-export function CreateCategoryForm({ onSuccess }: CreateCategoryFormProps) {
+export function CreateCategoryForm({ onSuccess, categoryToEdit }: CreateCategoryFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const isEditMode = !!categoryToEdit;
+
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       nome: "",
       tipo: "despesa",
-      cor: "#9d4edd", // Cor primária do tema (aproximação em hexadecimal de oklch(0.606 0.25 292.717))
+      cor: "#9d4edd",
       icone: "shopping-cart",
+      descricao: "",
     },
   });
 
-  const onSubmit = async (data: z.infer<typeof FormSchema>) => {
-    try {
-      setIsLoading(true);
-      // Simulando uma chamada de API
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      toast("Categoria criada com sucesso!", {
-        description: `A categoria "${data.nome}" foi criada.`,
+  // Preencher o formulário com os dados da categoria a ser editada
+  useEffect(() => {
+    if (categoryToEdit) {
+      // Garantir que o tipo seja 'receita' ou 'despesa'
+      const tipo = (categoryToEdit.tipo === 'receita' || categoryToEdit.type === 'receita') 
+        ? 'receita' 
+        : 'despesa';
+        
+      form.reset({
+        nome: categoryToEdit.nome || categoryToEdit.name || "",
+        tipo,
+        cor: categoryToEdit.cor || categoryToEdit.color || "#9d4edd",
+        icone: categoryToEdit.icone || categoryToEdit.icon || "shopping-cart",
+        descricao: categoryToEdit.description || "", // Usando description da API
       });
-      
-      // Aqui você pode adicionar a lógica para salvar a categoria no banco de dados
-      console.log("Dados do formulário:", data);
+    }
+  }, [categoryToEdit, form]);
 
-      if (onSuccess) {
-        onSuccess();
+  const onSubmit = async (formData: z.infer<typeof FormSchema>) => {
+    try {
+      console.log('Iniciando envio do formulário com dados:', formData);
+      setIsLoading(true);
+      
+      // Preparar os dados para a API
+      const categoriaData = {
+        nome: formData.nome,
+        tipo: formData.tipo,
+        cor: formData.cor,
+        icone: formData.icone,
+        descricao: formData.descricao || ''
+      };
+      
+      console.log('Dados formatados para a API:', categoriaData);
+      
+      try {
+        if (isEditMode && categoryToEdit?.id) {
+          // Modo de edição
+          console.log('Atualizando categoria existente...');
+          const categoriaAtualizada = await api.editarCategoria(
+            String(categoryToEdit.id), 
+            categoriaData
+          );
+          
+          console.log('Resposta da API (edição):', categoriaAtualizada);
+          
+          toast.success("Categoria atualizada com sucesso!", {
+            description: `A categoria "${formData.nome}" foi atualizada.`,
+          });
+        } else {
+          // Modo de criação
+          console.log('Criando nova categoria...');
+          const novaCategoria = await api.criarCategoria(categoriaData);
+          console.log('Resposta da API (criação):', novaCategoria);
+          
+          toast.success("Categoria criada com sucesso!", {
+            description: `A categoria "${formData.nome}" foi criada.`,
+          });
+        }
+        
+        // Chamar a função de sucesso para fechar o diálogo e atualizar a lista
+        if (onSuccess) {
+          console.log('Chamando onSuccess callback...');
+          onSuccess();
+        }
+      } catch (apiError) {
+        console.error('Erro na chamada da API:', apiError);
+        throw apiError; // Re-lança o erro para ser capturado pelo catch externo
       }
     } catch (error) {
       console.error("Erro ao criar categoria:", error);
-      toast.error("Ocorreu um erro ao criar a categoria. Tente novamente.");
+      toast.error(
+        `Erro ao criar a categoria: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
+      );
     } finally {
       setIsLoading(false);
     }
@@ -142,19 +203,6 @@ export function CreateCategoryForm({ onSuccess }: CreateCategoryFormProps) {
             >
               Receita
             </button>
-            
-            <button
-              type="button"
-              onClick={() => form.setValue("tipo", "transferencia")}
-              className={cn(
-                "inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                form.watch("tipo") === "transferencia"
-                  ? "border-purple-500/20 bg-purple-500/10 text-purple-800 dark:text-purple-400 hover:bg-purple-500/20"
-                  : "border-transparent bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              Transferência
-            </button>
           </div>
         </div>
         {form.formState.errors.tipo && (
@@ -180,13 +228,13 @@ export function CreateCategoryForm({ onSuccess }: CreateCategoryFormProps) {
         >
           {isLoading ? (
             <>
-              <Save className="mr-2 h-4 w-4" />
-              Salvando...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {isEditMode ? 'Salvando...' : 'Criando...'}
             </>
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />
-              Criar categoria
+              {isEditMode ? 'Salvar alterações' : 'Criar categoria'}
             </>
           )}
         </Button>

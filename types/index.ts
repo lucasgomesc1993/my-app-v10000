@@ -37,11 +37,26 @@ export function formatarData(data: string | Date): string {
 
 // Interface para categorias
 export interface Categoria {
-  id: string;
-  nome: string;
-  cor: string;
-  tipo: TipoTransacao;
+  id: string | number;
+  // Campos em português (frontend)
+  nome?: string;
+  cor?: string;
+  tipo?: TipoTransacao;
   icone?: string;
+  // Campos em inglês (API)
+  name?: string;
+  color?: string;
+  type?: TipoTransacao;
+  icon?: string;
+  description?: string;
+  parentId?: number | null;
+  isActive?: boolean;
+  sortOrder?: number;
+  ofxCategory?: string | null;
+  taxDeductible?: boolean;
+  userId?: number;
+  createdAt?: Date | string | number;
+  updatedAt?: Date | string | number;
 }
 
 // Interface para contas bancárias

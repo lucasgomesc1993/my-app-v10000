@@ -12,17 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { CreateAccountForm } from "@/components/forms/create-account-form";
 
-type ContaBancaria = {
-  id: string;
-  nome: string;
-  banco: string;
-  tipo: 'corrente' | 'poupança' | 'investimento' | 'outro';
-  saldo: number;
-  favorita: boolean;
-};
+import { CriarContaData } from "@/services/api";
 
 type CreateAccountDialogProps = {
-  onAccountCreated?: (conta: Omit<ContaBancaria, 'id' | 'favorita'>) => void;
+  onAccountCreated?: (conta: CriarContaData & { cor: string }) => void;
   children?: React.ReactNode;
 };
 
@@ -54,7 +47,10 @@ export function CreateAccountDialog({ onAccountCreated, children }: CreateAccoun
             Crie uma nova conta para gerenciar suas finanças.
           </p>
         </DialogHeader>
-        <CreateAccountForm onSuccess={handleSuccess} onSubmit={onAccountCreated} />
+        <CreateAccountForm 
+          onSuccess={handleSuccess} 
+          onSubmit={onAccountCreated}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -14,13 +14,24 @@ import {
 } from "@/components/ui/dialog";
 
 import { Badge } from "@/components/ui/badge";
-import { Account } from "@/lib/types";
+
+
+interface Conta {
+  id: string;
+  nome: string;
+  tipo: string;
+  saldo: number;
+  banco: string;
+  agencia?: string;
+  conta?: string;
+  favorita: boolean;
+}
 
 interface AccountActionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  account: Account | null;
-  onEdit: (account: Account) => void;
+  account: Conta | null;
+  onEdit: (account: Conta) => void;
   onDelete: (accountId: string) => void;
 }
 
@@ -64,7 +75,7 @@ export function AccountActionsDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              {account.name}
+              {account.nome}
             </DialogTitle>
             <DialogDescription>
               Visualize os detalhes da conta ou escolha uma ação.
@@ -78,31 +89,31 @@ export function AccountActionsDialog({
                 <span className="text-sm font-medium text-muted-foreground">
                   Tipo
                 </span>
-                <Badge variant="secondary">{account.type}</Badge>
+                <Badge variant="secondary">{account.tipo}</Badge>
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">
                   Banco
                 </span>
-                <span className="text-sm font-medium">{account.bankName}</span>
+                <span className="text-sm font-medium">{account.banco}</span>
               </div>
 
-              {account.agency && (
+              {account.agencia && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-muted-foreground">
                     Agência
                   </span>
-                  <span className="text-sm font-medium">{account.agency}</span>
+                  <span className="text-sm font-medium">{account.agencia}</span>
                 </div>
               )}
 
-              {account.accountNumber && (
+              {account.conta && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-muted-foreground">
                     Conta
                   </span>
-                  <span className="text-sm font-medium">{account.accountNumber}</span>
+                  <span className="text-sm font-medium">{account.conta}</span>
                 </div>
               )}
 
@@ -113,13 +124,13 @@ export function AccountActionsDialog({
                   Saldo Atual
                 </span>
                 <span className={`text-lg font-bold ${
-                  account.balance >= 0 ? "text-green-600" : "text-red-600"
+                  account.saldo >= 0 ? "text-green-600" : "text-red-600"
                 }`}>
-                  {formatCurrency(account.balance)}
+                  {formatCurrency(account.saldo)}
                 </span>
               </div>
 
-              {account.isFavorite && (
+              {account.favorita && (
                 <div className="flex items-center justify-center pt-2">
                   <Badge variant="outline" className="text-yellow-600 border-yellow-600">
                     ⭐ Conta Favorita
@@ -164,7 +175,7 @@ export function AccountActionsDialog({
           <DialogHeader>
             <DialogTitle>Confirmar Exclusão</DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja excluir a conta "{account.name}"? 
+              Tem certeza que deseja excluir a conta "{account.nome}"? 
               Esta ação não pode ser desfeita e todas as transações 
               associadas a esta conta serão afetadas.
             </DialogDescription>

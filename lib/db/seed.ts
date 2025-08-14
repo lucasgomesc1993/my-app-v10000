@@ -1,9 +1,77 @@
+console.log("🚀 [1/1] Iniciando script de seed...");
+
 import { db } from "./index";
 import { users, banks, categories, accounts, transactions, recurringTransactions, budgets, creditCards, invoices } from "./schema";
+import { sql } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
-export async function seedDatabase() {
+// Adiciona logs para verificar se os módulos foram importados corretamente
+console.log("✅ Módulos importados com sucesso!");
+console.log("🔍 Verificando conexão com o banco de dados...");
+
+// Testa a conexão com o banco de dados
+try {
+  const result = await db.select().from(users).limit(1);
+  console.log("✅ Conexão com o banco de dados estabelecida com sucesso!");
+  console.log(`ℹ️  Usuários no banco: ${result.length > 0 ? result.length : 'Nenhum'}`);
+} catch (error) {
+  console.error("❌ Erro ao conectar ao banco de dados:", error);
+  process.exit(1);
+}
+
+// Helper function to check if tables exist
+async function checkTablesExist(): Promise<boolean> {
+  try {
+    // Check if the users table exists
+    const result = await db.select().from(users).limit(1);
+    return true;
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(" Error checking if tables exist:", error.message);
+    } else {
+      console.error(" Unknown error checking if tables exist");
+    }
+    return false;
+  }
+}
+
+// Helper function to safely clear a table if it exists
+async function clearTableIfExists(tableName: string, table: any): Promise<void> {
+  try {
+    await db.delete(table);
+    console.log(`✅ Tabela ${tableName} limpa com sucesso`);
+  } catch (error) {
+    console.warn(`⚠️  Não foi possível limpar a tabela ${tableName}:`, error.message);
+  }
+}
+
+// Interface para tipar os dados do usuário
+interface UserData {
+  id: number;
+  email: string;
+  name: string;
+  // Adicione outros campos conforme necessário
+}
+
+// Função principal do seed
+async function main() {
   try {
     console.log("🚀 Iniciando seed do banco de dados...");
+
+    // Verificar se as tabelas existem
+    const tablesExist = await checkTablesExist();
+    if (!tablesExist) {
+      console.error("❌ As tabelas não existem. Execute as migrations primeiro.");
+      process.exit(1);
+      await clearTableIfExists('accounts', accounts);
+      await clearTableIfExists('categories', categories);
+      await clearTableIfExists('banks', banks);
+      await clearTableIfExists('users', users);
+    } else {
+      console.log("ℹ️  Tabelas não encontradas, pulando limpeza...");
+    }
+
+    console.log("🌱 Inserindo dados iniciais...");
 
     // Criar usuário teste
     const testUser = await db
@@ -244,6 +312,124 @@ export async function seedDatabase() {
         }))
       )
       .returning();
+
+    // Inserir cartões de crédito de exemplo
+    console.log("🔧 Inserindo cartões de crédito...");
+    try {
+      // Primeiro verifica se já existem cartões
+      const existingCards = await db.select().from(creditCards);
+      
+      if (existingCards.length === 0) {
+        console.log("ℹ️  Nenhum cartão encontrado. Inserindo cartões de exemplo...");
+        
+        const creditCardsData = [
+          {
+            userId: 2, // Usando o ID do usuário que já existe
+            name: "Cartão Nubank",
+            brand: "mastercard" as const,
+            type: "credito" as const,
+            lastFourDigits: "1234",
+            creditLimit: 5000.00,
+            currentBalance: 1320.45,
+            availableLimit: 3679.55,
+            closingDay: 5,
+            dueDay: 15,
+            color: "#8A05BE",
+            isFavorite: true,
+            isActive: true,
+            notes: "Cartão principal"
+          },
+          {
+            userId: 2, // Usando o ID do usuário que já existe
+            name: "Cartão Inter",
+            brand: "visa" as const,
+            type: "credito" as const,
+            lastFourDigits: "5678",
+            creditLimit: 3000.00,
+            currentBalance: 0.00,
+            availableLimit: 3000.00,
+            closingDay: 10,
+            dueDay: 20,
+            color: "#FF7A00",
+            isFavorite: false,
+            isActive: true,
+            notes: "Cartão para emergências"
+          }
+        ];
+
+        const insertedCreditCards = await db.insert(creditCards).values(creditCardsData).returning();
+        console.log(`✅ ${insertedCreditCards.length} cartões de crédito inseridos com sucesso!`);
+      } else {
+        console.log(`ℹ️  Já existem ${existingCards.length} cartões no banco. Pulando inserção.`);
+      }
+    } catch (error) {
+      console.error("❌ Erro ao inserir cartões de crédito:", error);
+      throw error;
+    }
+
+    // Criar faturas de exemplo
+    const sampleInvoices = [
+      {
+        userId,
+        creditCardId: creditCardsResult[0].id,
+        cardName: sampleCreditCards[0].name,
+        amount: 1250.75,
+        minimumAmount: 250.15,
+        previousBalance: 1000.00,
+        newBalance: 1250.75,
+        creditLimit: 5000.00,
+        availableCredit: 3749.25,
+        dueDate: Math.floor(new Date('2024-03-20').getTime() / 1000),
+        closingDate: Math.floor(new Date('2024-02-28').getTime() / 1000),
+        periodStart: Math.floor(new Date('2024-02-01').getTime() / 1000),
+        periodEnd: Math.floor(new Date('2024-02-28').getTime() / 1000),
+        status: "aberta" as const,
+        isPaid: false,
+        paidAmount: 0,
+        statementId: "INV-2024-02-001",
+        notes: "Fatura de fevereiro/2024",
+      },
+      {
+        userId,
+        creditCardId: creditCardsResult[1].id,
+        cardName: sampleCreditCards[1].name,
+        amount: 850.00,
+        minimumAmount: 170.00,
+        previousBalance: 600.00,
+        newBalance: 850.00,
+        creditLimit: 3000.00,
+        availableCredit: 2150.00,
+        dueDate: Math.floor(new Date('2024-03-25').getTime() / 1000),
+        closingDate: Math.floor(new Date('2024-03-10').getTime() / 1000),
+        periodStart: Math.floor(new Date('2024-02-11').getTime() / 1000),
+        periodEnd: Math.floor(new Date('2024-03-10').getTime() / 1000),
+        status: "aberta" as const,
+        isPaid: false,
+        paidAmount: 0,
+        statementId: "INV-2024-03-001",
+        notes: "Fatura de março/2024",
+      },
+    ];
+
+    console.log("\n🔧 Inserindo faturas...");
+    try {
+      await db.transaction(async (tx) => {
+        for (const [index, invoice] of sampleInvoices.entries()) {
+          console.log(`  💳 Inserindo fatura ${index + 1}/${sampleInvoices.length}...`);
+          await tx.insert(invoices).values({
+            ...invoice,
+            dueDate: new Date(invoice.dueDate * 1000),
+            closingDate: new Date(invoice.closingDate * 1000),
+            periodStart: new Date(invoice.periodStart * 1000),
+            periodEnd: new Date(invoice.periodEnd * 1000),
+          });
+        }
+      });
+      console.log(`✅ ${sampleInvoices.length} faturas inseridas com sucesso!`);
+    } catch (error) {
+      console.error("❌ Erro ao inserir faturas:", error);
+      throw error;
+    }
 
     // Criar transações de exemplo com dados completos para OFX
     const sampleTransactions = [

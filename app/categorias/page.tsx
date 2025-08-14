@@ -3,28 +3,21 @@
 import { useState, useEffect } from "react";
 import { PageLayout } from "@/components/layout/page-layout";
 import { Card, CardContent } from "@/components/card";
-import { CategoryDialog } from "@/components/dialogs/category-dialog";
 import { Categoria, TipoTransacao } from "@/types";
+import { CreateCategoryDialog } from "@/components/dialogs/create-category-dialog";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/badge";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/button";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-// Mock data for categories
-const data: Categoria[] = [
-  { id: "1", nome: "Salário", tipo: "receita", cor: "#10B981", icone: "dollar-sign" },
-  { id: "2", nome: "Alimentação", tipo: "despesa", cor: "#EF4444", icone: "utensils" },
-  { id: "3", nome: "Transporte", tipo: "despesa", cor: "#F59E0B", icone: "car" },
-  { id: "4", nome: "Moradia", tipo: "despesa", cor: "#3B82F6", icone: "home" },
-  { id: "5", nome: "Lazer", tipo: "despesa", cor: "#8B5CF6", icone: "film" },
-  { id: "6", nome: "Transferência", tipo: "transferencia", cor: "#8B5CF6", icone: "arrow-left-right" },
-];
+import { api } from "@/services/api";
+import { AddCategoryButton } from "@/components/add-category-button";
 
 // Mapeamento de ícones para cada tipo de transação
 const iconesPorTipo: Record<string, string> = {
@@ -41,83 +34,143 @@ const coresBadgePorTipo: Record<TipoTransacao, string> = {
 };
 
 export default function CategoriasPage() {
-  const [categorias, setCategorias] = useState<Categoria[]>(data);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  const handleEditarCategoria = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    console.log("Editar categoria:", id);
+  // Função para normalizar os dados da categoria
+  const normalizarCategoria = (categoria: Categoria): Categoria => {
+    return {
+      ...categoria,
+      // Garante que o ID seja uma string
+      id: String(categoria.id),
+      // Usa os campos em inglês se os em português não estiverem disponíveis
+      nome: categoria.nome || categoria.name || 'Sem nome',
+      cor: categoria.cor || categoria.color || '#9d4edd',
+      tipo: categoria.tipo || categoria.type || 'despesa',
+      icone: categoria.icone || categoria.icon || 'tag'
+    };
   };
 
-  const handleExcluirCategoria = (id: string, e: React.MouseEvent) => {
+  const carregarCategorias = async () => {
+    try {
+      setLoading(true);
+      const categoriasData = await api.buscarCategorias();
+      // Normaliza os dados antes de definir o estado
+      const categoriasNormalizadas = categoriasData.map(normalizarCategoria);
+      setCategorias(categoriasNormalizadas);
+    } catch (error) {
+      console.error("Erro ao carregar categorias:", error);
+      toast.error("Erro ao carregar categorias");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarCategorias();
+  }, []);
+
+  const [categoriaParaEditar, setCategoriaParaEditar] = useState<Categoria | null>(null);
+  const [dialogAberto, setDialogAberto] = useState(false);
+
+  const handleEditarCategoria = (categoria: Categoria, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCategoriaParaEditar(categoria);
+    setDialogAberto(true);
+  };
+
+  const handleFecharDialog = () => {
+    setDialogAberto(false);
+    setCategoriaParaEditar(null);
+  };
+
+  const handleSucessoCategoria = () => {
+    carregarCategorias();
+    handleFecharDialog();
+  };
+
+  const handleExcluirCategoria = async (categoria: Categoria, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (confirm("Tem certeza que deseja excluir esta categoria?")) {
-      setCategorias(prevCategorias => 
-        prevCategorias.filter(cat => cat.id !== id)
-      );
-      
-      // Aqui você pode adicionar uma chamada à API para excluir a categoria no backend
-      // await api.delete(`/categorias/${id}`);
-      
-      // Se necessário, você pode mostrar uma notificação de sucesso
-      // toast.success("Categoria excluída com sucesso!");
+    if (confirm(`Tem certeza que deseja excluir a categoria "${categoria.nome}"?`)) {
+      try {
+        // Garante que o ID seja uma string
+        await api.excluirCategoria(String(categoria.id));
+        toast.success("Categoria excluída com sucesso!");
+        carregarCategorias(); // Recarregar lista após exclusão
+      } catch (error) {
+        console.error("Erro ao excluir categoria:", error);
+        toast.error("Erro ao excluir categoria");
+      }
     }
   };
 
-  const getIcone = (categoria: Categoria) => {
-    // Se a categoria tiver um ícone específico, usa-o, senão usa o padrão do tipo
-    return categoria.icone || iconesPorTipo[categoria.tipo] || "tag";
+  // Função para obter o componente do ícone dinamicamente
+  const getIconComponent = (iconName: string) => {
+    try {
+      if (!iconName) return require('lucide-react').Tag;
+      
+      // Remove o prefixo 'lucide:' se existir
+      const cleanIconName = iconName.replace('lucide:', '');
+      
+      // Converte o nome do ícone para o formato PascalCase que o Lucide usa
+      const formattedName = cleanIconName
+        .split('-')
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join('');
+      
+      // Tenta importar o ícone dinamicamente
+      const lucideIcons = require('lucide-react');
+      const IconComponent = lucideIcons[formattedName] || lucideIcons.Tag;
+      
+      return IconComponent;
+    } catch (error) {
+      console.error(`Erro ao carregar o ícone ${iconName}:`, error);
+      return require('lucide-react').Tag;
+    }
   };
 
-  // Agrupar categorias por tipo
-  const categoriasPorTipo = categorias.reduce((acc, categoria) => {
-    if (!acc[categoria.tipo]) {
-      acc[categoria.tipo] = [];
-    }
-    acc[categoria.tipo].push(categoria);
-    return acc;
-  }, {} as Record<TipoTransacao, Categoria[]>);
+  // Função para obter o nome do ícone de forma consistente
+  const getIconName = (categoria: Categoria) => {
+    // Tenta obter o ícone em português, depois em inglês, depois o padrão para o tipo
+    const iconName = categoria.icone || categoria.icon || iconesPorTipo[categoria.tipo as TipoTransacao] || "tag";
+    // Remove o prefixo 'lucide:' se existir para manter consistência
+    return iconName.replace('lucide:', '');
+  };
+
+  if (loading) {
+    return (
+      <PageLayout title="Categorias">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-muted-foreground">Carregando categorias...</div>
+        </div>
+      </PageLayout>
+    );
+  }
 
   return (
     <PageLayout
       title="Categorias"
       actionButtons={
-        <AddCategoryButton />
+        <AddCategoryButton onCategoryCreated={carregarCategorias} />
       }
     >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Diálogo de edição */}
+        <CreateCategoryDialog 
+          open={dialogAberto} 
+          onOpenChange={(open: boolean) => !open && handleFecharDialog()}
+          categoryToEdit={categoriaParaEditar}
+          onCategoryCreated={handleSucessoCategoria}
+        />
         {categorias.map((categoria) => {
-                  // Função para formatar o nome do ícone para o formato PascalCase
-                  const formatarNomeIcone = (nomeIcone: string) => {
-                    return nomeIcone
-                      .split('-')
-                      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                      .join('');
-                  };
-
-                  // Tenta obter o componente de ícone
-                  let Icone;
-                  try {
-                    // Tenta obter o ícone específico da categoria
-                    if (categoria.icone) {
-                      const nomeFormatado = formatarNomeIcone(categoria.icone);
-                      Icone = require('lucide-react')[nomeFormatado];
-                    }
-                    
-                    // Se não encontrou o ícone específico, tenta obter o ícone padrão do tipo
-                    if (!Icone && iconesPorTipo[categoria.tipo]) {
-                      const nomePadrao = formatarNomeIcone(iconesPorTipo[categoria.tipo]);
-                      Icone = require('lucide-react')[nomePadrao];
-                    }
-                    
-                    // Se ainda não encontrou, usa o ícone Tag como fallback
-                    if (!Icone) {
-                      Icone = require('lucide-react').Tag;
-                    }
-                  } catch (error) {
-                    // Em caso de erro, usa o ícone Tag
-                    Icone = require('lucide-react').Tag;
-                  }
+                  // Obtém o nome do ícone
+                  const iconName = getIconName(categoria);
+                  // Obtém o componente do ícone
+                  const Icone = getIconComponent(iconName);
+                  
+                  // Já normalizamos os dados, então podemos usar o campo 'cor' diretamente
+                  const iconColor = categoria.cor;
                   
                   return (
                     <div 
@@ -134,16 +187,19 @@ export default function CategoriasPage() {
                           <div className="flex items-center gap-3">
                             <div 
                               className="w-11 h-11 rounded-lg flex items-center justify-center"
-                              style={{ backgroundColor: `${categoria.cor}20` }}
+                              style={{ 
+                                backgroundColor: `${iconColor}20`,
+                                color: iconColor
+                              }}
                             >
-                              <Icone className="w-5 h-5" style={{ color: categoria.cor }} />
+                              <Icone className="w-5 h-5" style={{ color: 'inherit' }} />
                             </div>
                             <div>
                               <h3 className="font-medium text-foreground">{categoria.nome}</h3>
                               <Badge 
                                 className={cn(
                                   "mt-1 text-xs capitalize",
-                                  coresBadgePorTipo[categoria.tipo]
+                                  coresBadgePorTipo[categoria.tipo as TipoTransacao]
                                 )}
                               >
                                 {categoria.tipo}
@@ -160,14 +216,14 @@ export default function CategoriasPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-40">
                               <DropdownMenuItem 
-                                onClick={(e) => handleEditarCategoria(categoria.id, e)}
+                                onClick={(e) => handleEditarCategoria(categoria, e)}
                                 className="cursor-pointer"
                               >
                                 <Pencil className="mr-2 h-4 w-4" />
                                 <span>Editar</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={(e) => handleExcluirCategoria(categoria.id, e)}
+                                onClick={(e) => handleExcluirCategoria(categoria, e)}
                                 className="text-destructive focus:text-destructive cursor-pointer"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />

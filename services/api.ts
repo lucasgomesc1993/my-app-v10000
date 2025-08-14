@@ -25,7 +25,7 @@ type CriarTransacaoData = {
   observacoes?: string
 }
 
-type CriarContaData = {
+export type CriarContaData = {
   nome: string
   tipo: 'corrente' | 'poupanca' | 'investimento'
   bancoId: string
@@ -43,6 +43,26 @@ type CriarCategoriaData = {
 }
 
 export const api = {
+  async atualizarTransacao(id: string, data: any): Promise<Transacao> {
+    try {
+      const response = await fetch(`/api/transactions/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar transação');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao atualizar transação:', error);
+      throw error;
+    }
+  },
   // Transações
   async buscarTransacoes({
     filtros = {},
@@ -183,6 +203,8 @@ export const api = {
 
   async criarConta(data: CriarContaData): Promise<any> {
     try {
+      console.log('Dados enviados para criar conta:', data);
+      
       const response = await fetch('/api/accounts', {
         method: 'POST',
         headers: {
@@ -191,11 +213,17 @@ export const api = {
         body: JSON.stringify(data),
       })
 
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Erro ao criar conta')
+        const errorData = await response.text();
+        console.error('Erro na resposta da API:', errorData);
+        throw new Error(`Erro ao criar conta: ${response.status} - ${errorData}`)
       }
 
-      return await response.json()
+      const result = await response.json();
+      console.log('Conta criada com sucesso:', result);
+      return result;
     } catch (error) {
       console.error('Erro ao criar conta:', error)
       throw error
@@ -270,22 +298,28 @@ export const api = {
 
   async criarCategoria(data: CriarCategoriaData): Promise<any> {
     try {
+      console.log('Enviando dados para criar categoria:', data);
       const response = await fetch('/api/categories', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
-      })
+      });
 
+      const responseData = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Erro ao criar categoria')
+        const errorMessage = responseData.error || 'Erro ao criar categoria';
+        console.error('Erro na resposta da API:', errorMessage, responseData);
+        throw new Error(errorMessage);
       }
 
-      return await response.json()
+      console.log('Categoria criada com sucesso:', responseData);
+      return responseData;
     } catch (error) {
-      console.error('Erro ao criar categoria:', error)
-      throw error
+      console.error('Erro ao criar categoria:', error);
+      throw error;
     }
   },
 
@@ -347,6 +381,34 @@ export const api = {
     }
   },
 
+  // Criar banco
+  async criarBanco(data: { name: string }): Promise<{ id: number; name: string }> {
+    try {
+      const response = await fetch('/api/banks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: data.name,
+          code: '999', // Código genérico para bancos personalizados
+          fullName: data.name,
+          isActive: true
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao criar banco');
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Erro ao criar banco:', error);
+      throw error;
+    }
+  },
+
   // Cartões de Crédito
   async buscarCartoes(): Promise<any[]> {
     try {
@@ -371,6 +433,8 @@ export const api = {
 
   async criarCartao(data: any): Promise<any> {
     try {
+      console.log('Dados enviados para criar cartão:', data);
+      
       const response = await fetch('/api/credit-cards', {
         method: 'POST',
         headers: {
@@ -379,11 +443,17 @@ export const api = {
         body: JSON.stringify(data),
       })
 
+      console.log('Response status (cartão):', response.status);
+
       if (!response.ok) {
-        throw new Error('Erro ao criar cartão')
+        const errorData = await response.text();
+        console.error('Erro na resposta da API (cartão):', errorData);
+        throw new Error(`Erro ao criar cartão: ${response.status} - ${errorData}`)
       }
 
-      return await response.json()
+      const result = await response.json();
+      console.log('Cartão criado com sucesso:', result);
+      return result;
     } catch (error) {
       console.error('Erro ao criar cartão:', error)
       throw error

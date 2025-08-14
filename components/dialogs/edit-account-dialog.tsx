@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-// import { EditAccountForm } from "@/components/forms/edit-account-form";
+import { EditAccountForm } from "@/components/forms/edit-account-form";
 
 interface ContaBancaria {
   id: string;
@@ -54,16 +54,11 @@ export function EditAccountDialog({
             Atualize as informações da sua conta bancária.
           </p>
         </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Funcionalidade de edição em desenvolvimento.
-          </p>
-          <div className="flex justify-end">
-            <Button onClick={() => onOpenChange(false)}>
-              Fechar
-            </Button>
-          </div>
-        </div>
+        <EditAccountForm 
+          account={account} 
+          onSuccess={handleSuccess}
+          onCancel={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );

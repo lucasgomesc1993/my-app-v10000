@@ -18,13 +18,24 @@ import {
 } from "@/components/select";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { api } from "@/services/api";
 import { ColorPicker } from "@/components/ui/color-picker";
-import { NewCreditCard } from "@/lib/types";
+
+type CartaoCredito = {
+  id: string;
+  nome: string;
+  bandeira: 'visa' | 'mastercard' | 'elo' | 'outro';
+  banco?: string;
+  cor: string;
+  limite: number;
+  fechamento: number;
+  vencimento: number;
+  faturaAtual: number;
+  favorito: boolean;
+};
 
 type CreateCreditCardFormProps = {
   onSuccess?: () => void;
-  onSubmit?: (cartao: NewCreditCard) => void;
+  onSubmit?: (cartao: Omit<CartaoCredito, 'id' | 'favorito' | 'faturaAtual' | 'tipo'> & { tipo?: never }) => void;
 };
 
 const bandeiras = ["visa", "mastercard", "elo", "outro"] as const;
@@ -41,6 +52,11 @@ const creditCardFormSchema = z.object({
   }),
   bandeira: z.string().min(1, "Por favor, selecione a bandeira do cartão."),
   banco: z.string().optional(),
+  ultimosDigitos: z.string().min(4, {
+    message: "Por favor, insira os 4 últimos dígitos do cartão.",
+  }).max(4, {
+    message: "Por favor, insira apenas os 4 últimos dígitos.",
+  }),
   cor: z.string().min(1, {
     message: "Por favor, selecione uma cor para o cartão.",
   }).regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
@@ -79,6 +95,7 @@ export function CreateCreditCardForm({
       nome: "",
       bandeira: "visa",
       banco: "",
+      ultimosDigitos: "",
       cor: "#3b82f6", // Cor azul como padrão
       limite: "0,00",
       fechamento: 10,
@@ -90,21 +107,22 @@ export function CreateCreditCardForm({
     try {
       setIsLoading(true);
       
-      const novoCartao: Omit<NewCreditCard, 'userId' | 'lastFourDigits'> = {
-        name: data.nome,
-        brand: data.bandeira as Bandeira,
-        // bancoId: data.bancoId, // Adicionar seleção de banco se necessário
-        cor: data.cor,
-        creditLimit: parseFloat(data.limite.replace(".", "").replace(",", ".")),
-        closingDay: data.fechamento,
-        dueDay: data.vencimento,
-        type: 'credito', // ou outro tipo padrão
-      };
+      // Simulando uma chamada de API
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      
+      const novoCartao = {
+        nome: data.nome,
+        bandeira: data.bandeira as Bandeira,
+        banco: data.banco || undefined, // Garante que seja undefined se for string vazia
+        limite: parseFloat(data.limite.replace(".", "").replace(",", ".")),
+        fechamento: data.fechamento,
+        vencimento: data.vencimento,
+        faturaAtual: 0, // Inicia com fatura zerada
+        lastFourDigits: data.ultimosDigitos,
+        type: 'credito',
+      } as NewCreditCard;
 
-      // Adicionar lastFourDigits se for um campo no formulário
-      // novoCartao.lastFourDigits = '1234';
-
-      await api.criarCartao(novoCartao as NewCreditCard);
+      await api.criarCartao(novoCartao);
 
       // Se houver um callback de submissão, chama ele
       if (onSubmit) {
@@ -203,6 +221,21 @@ export function CreateCreditCardForm({
       </div>
 
       <div className="space-y-2">
+        <Label htmlFor="ultimosDigitos">Últimos 4 dígitos</Label>
+        <Input
+          id="ultimosDigitos"
+          placeholder="Ex: 1234"
+          maxLength={4}
+          {...form.register("ultimosDigitos")}
+        />
+        {form.formState.errors.ultimosDigitos && (
+          <p className="text-sm text-red-500">
+            {form.formState.errors.ultimosDigitos.message}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="limite">Limite do Cartão</Label>
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -259,15 +292,33 @@ export function CreateCreditCardForm({
 
       <div className="space-y-2">
         <Label>Cor do Cartão</Label>
-        <ColorPicker
-          value={form.watch("cor") || selectedColor}
-          onChange={(value: string) => {
-            setSelectedColor(value);
-            form.setValue("cor", value);
-          }}
-        />
+        <div className="flex items-center gap-4">
+          <ColorPicker
+            value={form.watch("cor") || selectedColor}
+            onChange={(value: string) => {
+              setSelectedColor(value);
+              form.setValue("cor", value, { shouldValidate: true });
+            }}
+            onBlur={() => form.trigger("cor")}
+            aria-describedby="cor-error"
+            aria-invalid={!!form.formState.errors.cor}
+          />
+          <div className="flex-1">
+            <Input
+              type="text"
+              value={form.watch("cor") || selectedColor}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSelectedColor(value);
+                form.setValue("cor", value, { shouldValidate: true });
+              }}
+              className="w-full"
+              placeholder="#3b82f6"
+            />
+          </div>
+        </div>
         {form.formState.errors.cor && (
-          <p className="text-sm text-red-500">
+          <p id="cor-error" className="mt-1 text-sm text-red-500">
             {form.formState.errors.cor.message}
           </p>
         )}

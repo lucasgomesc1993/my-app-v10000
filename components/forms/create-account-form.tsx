@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
-import { Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -16,35 +15,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/select";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ColorPicker } from "@/components/ui/color-picker";
-import { api } from "@/services/api";
-import { Bank, Account } from "@/lib/types";
+
+type ContaBancaria = {
+  id: string;
+  nome: string;
+  banco: string;
+  tipo: 'corrente' | 'poupança' | 'investimento' | 'outro';
+  cor: string;
+  saldo: number;
+  favorita: boolean;
+};
 
 type CreateAccountFormProps = {
   onSuccess?: () => void;
-  onSubmit?: (conta: Omit<Account, 'id' | 'isFavorite' | 'userId' | 'createdAt' | 'updatedAt' | 'balance' | 'initialBalance' | 'bankId' | 'agency' | 'agencyDigit' | 'accountNumber' | 'accountDigit' | 'bankCode' | 'branchId' | 'accountId' | 'ofxAccountType' | 'ofxBankId' | 'ofxBranchId' | 'ofxAccountId' | 'description' | 'syncEnabled' | 'creditLimit' | 'lastSync'> & { saldo: number }) => void;
+  onCancel?: () => void;
+  onSubmit?: (conta: Omit<ContaBancaria, 'id' | 'favorita'>) => Promise<void> | void;
 };
 
-const tiposConta = ["corrente", "poupança", "investimento", "outro"] as const;
-
-const corPadrao = '#3b82f6'; // Cor azul padrão
-
-type TipoConta = typeof tiposConta[number];
+const corPadrao = '#3b82f6';
 
 const accountFormSchema = z.object({
   nome: z.string().min(2, {
     message: "O nome da conta deve ter pelo menos 2 caracteres.",
   }),
-  bancoId: z.string().min(1, "Por favor, selecione um banco."),
+  banco: z.string().min(2, {
+    message: "O nome do banco deve ter pelo menos 2 caracteres.",
+  }),
   tipo: z.string().min(1, "Por favor, selecione um tipo de conta."),
   cor: z.string().min(1, {
     message: "Por favor, selecione uma cor para a conta.",
   }).regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
     message: "Por favor, insira uma cor hexadecimal válida.",
   }),
-  saldoInicial: z.string().refine(
+  saldoInicial: z.string().min(1, "Por favor, insira um valor.").refine(
     (val) => {
       const num = parseFloat(val.replace(/[^0-9,-]+/g, "").replace(",", "."));
       return !isNaN(num);
@@ -59,93 +64,73 @@ type AccountFormValues = z.infer<typeof accountFormSchema>;
 
 export function CreateAccountForm({
   onSuccess,
+  onCancel,
   onSubmit,
 }: CreateAccountFormProps) {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedColor, setSelectedColor] = useState(corPadrao);
-  const [banks, setBanks] = useState<Bank[]>([]);
 
-  const form = useForm<z.infer<typeof accountFormSchema>>({
+  const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
     defaultValues: {
       nome: "",
-      bancoId: "",
+      banco: "",
       tipo: "corrente",
-      cor: "#3b82f6", // Cor azul como padrão
+      cor: corPadrao,
       saldoInicial: "0,00",
     },
   });
 
-  useEffect(() => {
-    const fetchBanks = async () => {
-      try {
-        const banksData = await api.buscarBancos();
-        setBanks(banksData);
-      } catch (error) {
-        toast.error("Falha ao carregar os bancos.");
-      }
-    };
-    fetchBanks();
-  }, []);
-
-  const handleSubmit = async (data: z.infer<typeof accountFormSchema>) => {
+  const handleSubmit = async (data: AccountFormValues) => {
     try {
       setIsLoading(true);
       
-      // Preparar dados para a API
-      const saldoInicial = parseFloat(data.saldoInicial.replace(/[^0-9,-]+/g, "").replace(",", "."));
-      
+      const saldoInicial = parseFloat(
+        data.saldoInicial.replace(/[^0-9,-]+/g, "").replace(",", ".")
+      );
+
       const contaData = {
         nome: data.nome,
-        tipo: data.tipo === 'poupança' ? 'poupanca' : data.tipo as 'corrente' | 'investimento' | 'outro',
-        bancoId: data.bancoId,
-        saldoInicial: saldoInicial,
+        banco: data.banco,
+        tipo: data.tipo as 'corrente' | 'poupança' | 'investimento' | 'outro',
+        cor: data.cor,
+        saldo: saldoInicial,
       };
 
-      // Chamar a API real para criar a conta
-      const contaCriada = await api.criarConta(contaData);
-      
-      // Se houver um callback de submissão, chama ele com os dados da API
       if (onSubmit) {
-        const novaConta = {
-          name: contaCriada.name || data.nome,
-          bankName: banks.find(b => b.id === data.bancoId)?.name || 'N/A',
-          tipo: data.tipo as TipoConta,
-          cor: data.cor,
-          saldo: contaCriada.balance || saldoInicial,
-        };
-        onSubmit(novaConta);
+        await onSubmit(contaData);
       }
 
       toast.success("Conta criada com sucesso!");
       
-      // Limpar o formulário
-      form.reset();
-      
-      // Fecha o diálogo se houver um callback de sucesso
       if (onSuccess) {
         onSuccess();
       }
+      
+      form.reset({
+        nome: "",
+        banco: "",
+        tipo: "corrente",
+        cor: corPadrao,
+        saldoInicial: "0,00",
+      });
+      
     } catch (error) {
       console.error("Erro ao criar conta:", error);
-      toast.error("Erro ao criar a conta. Verifique os dados e tente novamente.");
+      toast.error("Erro ao criar a conta. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   const formatCurrency = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Remove todos os caracteres não numéricos, incluindo o R$ e espaços
     let value = e.target.value.replace(/[^0-9,]/g, '');
     
-    // Se não houver valor, limpa o campo
     if (!value) {
       form.setValue("saldoInicial", "");
       return;
     }
     
-    // Converte para número e formata
     value = (parseInt(value.replace(/\D/g, '')) / 100).toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -160,8 +145,9 @@ export function CreateAccountForm({
         <Label htmlFor="nome">Nome da Conta</Label>
         <Input
           id="nome"
-          placeholder="Ex: Conta Principal"
+          placeholder="Ex: Conta Corrente"
           {...form.register("nome")}
+          disabled={isLoading}
         />
         {form.formState.errors.nome && (
           <p className="text-sm text-red-500">
@@ -171,23 +157,16 @@ export function CreateAccountForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="bancoId">Banco</Label>
-        <Select
-          onValueChange={(value) => form.setValue("bancoId", value)}
-          defaultValue={form.watch("bancoId")}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione o banco" />
-          </SelectTrigger>
-          <SelectContent>
-            {banks.map((bank) => (
-              <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {form.formState.errors.bancoId && (
+        <Label htmlFor="banco">Banco</Label>
+        <Input
+          id="banco"
+          placeholder="Ex: Nubank, Itaú, etc."
+          {...form.register("banco")}
+          disabled={isLoading}
+        />
+        {form.formState.errors.banco && (
           <p className="text-sm text-red-500">
-            {form.formState.errors.bancoId.message}
+            {form.formState.errors.banco.message}
           </p>
         )}
       </div>
@@ -195,10 +174,9 @@ export function CreateAccountForm({
       <div className="space-y-2">
         <Label htmlFor="tipo">Tipo de Conta</Label>
         <Select
-          onValueChange={(value) =>
-            form.setValue("tipo", value as AccountFormValues["tipo"])
-          }
-          defaultValue={form.watch("tipo")}
+          value={form.watch("tipo")}
+          onValueChange={(value) => form.setValue("tipo", value)}
+          disabled={isLoading}
         >
           <SelectTrigger>
             <SelectValue placeholder="Selecione o tipo de conta" />
@@ -217,18 +195,35 @@ export function CreateAccountForm({
         )}
       </div>
 
-      <div className="grid gap-2">
-        <Label htmlFor="cor">Cor da Conta</Label>
-        <ColorPicker
-          value={form.watch("cor") || selectedColor}
-          onChange={(value: string) => {
-            form.setValue("cor", value);
-            setSelectedColor(value);
-          }}
-        />
+      <div className="space-y-2">
+        <Label>Cor da Conta</Label>
+        <div className="flex items-center gap-2">
+          <div 
+            className="w-8 h-8 rounded-full border" 
+            style={{ backgroundColor: form.watch("cor") || selectedColor }}
+          />
+          <Input
+            value={form.watch("cor")}
+            onChange={(e) => {
+              form.setValue("cor", e.target.value);
+              setSelectedColor(e.target.value);
+            }}
+            className="flex-1"
+            disabled={isLoading}
+          />
+        </div>
+        <div className="mt-2">
+          <ColorPicker 
+            value={form.watch("cor") || selectedColor}
+            onChange={(color) => {
+              form.setValue("cor", color);
+              setSelectedColor(color);
+            }}
+          />
+        </div>
         {form.formState.errors.cor && (
-          <p className="text-sm font-medium text-destructive">
-            {form.formState.errors.cor.message?.toString()}
+          <p className="text-sm text-red-500">
+            {form.formState.errors.cor.message}
           </p>
         )}
       </div>
@@ -241,10 +236,11 @@ export function CreateAccountForm({
           </span>
           <Input
             id="saldoInicial"
+            placeholder="0,00"
             className="pl-12"
             value={form.watch("saldoInicial")}
             onChange={formatCurrency}
-            placeholder="0,00"
+            disabled={isLoading}
           />
         </div>
         {form.formState.errors.saldoInicial && (
@@ -254,19 +250,19 @@ export function CreateAccountForm({
         )}
       </div>
 
-      <div className="flex justify-end space-x-3 pt-4">
+      <div className="flex justify-end gap-2 pt-4">
         <Button
           type="button"
           variant="outline"
-          onClick={onSuccess}
+          onClick={onCancel}
           disabled={isLoading}
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading} className="min-w-[120px]">
           {isLoading ? (
             <>
-              <Save className="mr-2 h-4 w-4" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Salvando...
             </>
           ) : (

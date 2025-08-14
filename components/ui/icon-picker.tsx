@@ -29,18 +29,41 @@ interface IconPickerProps {
 export function IconPicker({ value, onChange, className, color = '#3b82f6' }: IconPickerProps) {
   const [open, setOpen] = useState(false);
   
+  // Função para formatar o nome do ícone para o formato do Lucide
+  const formatIconName = (name: string) => {
+    if (!name) return '';
+    // Remove o prefixo 'lucide:' se existir
+    const cleanName = name.replace('lucide:', '');
+    // Converte para o formato PascalCase que o Lucide usa
+    return cleanName
+      .split('-')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join('');
+  };
+
   // Função para importar dinamicamente o ícone
   const IconComponent = ({ name, className, color }: { name: string; className?: string; color?: string }) => {
-    // @ts-ignore - Importação dinâmica de ícones
-    const Icon = require(`lucide-react`)[name.charAt(0).toUpperCase() + name.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())];
-    return Icon ? <Icon className={cn("h-4 w-4", className)} style={{ color }} /> : <span className="h-4 w-4" style={{ color }} />;
+    try {
+      const formattedName = formatIconName(name);
+      // @ts-ignore - Importação dinâmica de ícones
+      const Icon = require('lucide-react')[formattedName];
+      return Icon ? (
+        <Icon className={cn("h-4 w-4", className)} style={{ color }} />
+      ) : (
+        <span className="h-4 w-4" style={{ color }} />
+      );
+    } catch (error) {
+      console.error(`Erro ao carregar o ícone ${name}:`, error);
+      return <span className="h-4 w-4" style={{ color }} />;
+    }
   };
 
   const [searchTerm, setSearchTerm] = useState("");
   
   const filteredIcons = ICONS.filter(icon => 
-    icon.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    icon.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    icon.replace(/-/g, ' ').toLowerCase().includes(searchTerm.toLowerCase())
+  ).sort((a, b) => a.localeCompare(b));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

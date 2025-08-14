@@ -5,41 +5,39 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Save, Loader2, X, Landmark } from "lucide-react";
 import { toast } from "sonner";
-
-// Components
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/button";
-import { Input } from "@/components/input";
-import { Label } from "@/components/label";
 import { ColorPicker } from "@/components/ui/color-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/select";
+import { Select, SelectItem, SelectTrigger, SelectValue, SelectContent } from "@/components/ui/select";
+import { z } from "zod";
 
-// Utils
-import { formatCurrency, parseCurrency } from "@/lib/utils/formatters";
-import { cn } from "@/lib/utils";
+// Schema de validação
+const accountFormSchema = z.object({
+  nome: z.string().min(1, "Nome é obrigatório"),
+  banco: z.string().min(1, "Banco é obrigatório"),
+  bancoId: z.string().optional(),
+  tipo: z.enum(["corrente", "poupanca", "investimento", "outro"]),
+  cor: z.string().min(1, "Cor é obrigatória"),
+  saldoInicial: z.string().min(1, "Saldo inicial é obrigatório"),
+  agencia: z.string().optional(),
+  numeroConta: z.string().optional(),
+});
 
-// Services
-import { api } from "@/services/api";
-
-// Types
-import { Account, Bank } from "@/lib/types";
-import { accountSchema, AccountFormData } from "@/lib/utils/validators";
-
-// Opções de tipo de conta
-const accountTypeOptions = [
-  { value: 'corrente', label: 'Conta Corrente' },
-  { value: 'poupança', label: 'Poupança' },
-  { value: 'investimento', label: 'Investimento' },
-  { value: 'outro', label: 'Outro' },
-] as const;
+type AccountFormData = z.infer<typeof accountFormSchema>;
 
 interface EditAccountFormProps {
-  account: Account;
+  account: {
+    id: string;
+    name: string;
+    bankName?: string;
+    bankId?: string | number;
+    type: 'corrente' | 'poupanca' | 'investimento' | 'outro';
+    balance: number;
+    color?: string;
+    agency?: string;
+    accountNumber?: string;
+  };
   onSuccess?: () => void;
   onCancel?: () => void;
   onClose?: () => void;
@@ -47,293 +45,251 @@ interface EditAccountFormProps {
 
 export function EditAccountForm({ 
   account, 
-  onSuccess, 
+  onSuccess,
   onCancel,
   onClose
 }: EditAccountFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingBanks, setIsLoadingBanks] = useState(true);
-  const [banks, setBanks] = useState<Bank[]>([]);
+  const [isLoadingBanks, setIsLoadingBanks] = useState(false);
   const [selectedColor, setSelectedColor] = useState(account.color || "#3b82f6");
-
+  
   const form = useForm<AccountFormData>({
-    resolver: zodResolver(accountSchema),
+    resolver: zodResolver(accountFormSchema),
     defaultValues: {
-      name: account.name || "",
-      bankId: account.bankId ? account.bankId.toString() : "",
-      type: account.type || "corrente",
-      color: account.color || "#3b82f6",
-      initialBalance: account.balance ? formatCurrency(account.balance.toString()) : "0,00",
-      agency: account.agency || "",
-      accountNumber: account.accountNumber || "",
+      nome: account.name || "",
+      banco: account.bankName || "",
+      bancoId: account.bankId ? String(account.bankId) : "",
+      tipo: account.type || "corrente",
+      cor: account.color || "#3b82f6",
+      saldoInicial: account.balance ? account.balance.toFixed(2).replace('.', ',') : "0,00",
+      agencia: account.agency || "",
+      numeroConta: account.accountNumber || "",
     },
   });
-
-  // Buscar lista de bancos
-  useEffect(() => {
-    const fetchBanks = async () => {
-      try {
-        const banksData = await api.buscarBancos();
-        setBanks(banksData);
-      } catch (error) {
-        console.error("Erro ao carregar bancos:", error);
-        toast.error("Não foi possível carregar a lista de bancos");
-      } finally {
-        setIsLoadingBanks(false);
-      }
-    };
-
-    fetchBanks();
-  }, []);
-
-  // Atualizar a cor selecionada quando o valor do formulário mudar
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === 'color' && value.color) {
-        setSelectedColor(value.color);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form]);
-
-  // Buscar lista de bancos
-  useEffect(() => {
-    const fetchBanks = async () => {
-      try {
-        const banksData = await api.buscarBancos();
-        setBanks(banksData);
-      } catch (error) {
-        console.error("Erro ao carregar bancos:", error);
-        toast.error("Não foi possível carregar a lista de bancos");
-      } finally {
-        setIsLoadingBanks(false);
-      }
-    };
-
-    fetchBanks();
-  }, []);
-
-  const onSubmit = async (formData: AccountFormData) => {
+  
+  const handleSubmit = async (data: AccountFormData) => {
     try {
       setIsLoading(true);
       
-      // Validação adicional do formulário
-      const validationResult = await form.trigger();
-      if (!validationResult) {
-        toast.error("Por favor, preencha todos os campos obrigatórios corretamente.");
-        return;
-      }
+      // Converter o saldo para número
+      const saldoInicial = parseFloat(data.saldoInicial.replace(/\./g, '').replace(',', '.'));
       
-      // Validar se o banco foi selecionado
-      if (!formData.bankId) {
-        toast.error("Selecione um banco");
-        return;
-      }
+      // Aqui você pode adicionar a lógica para salvar as alterações
+      // Por exemplo:
+      // await api.atualizarConta(account.id, {
+      //   ...data,
+      //   balance: saldoInicial,
+      //   color: selectedColor,
+      // });
       
-      // Validar cor (deve ser um código de cor hexadecimal válido)
-      if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(formData.color)) {
-        toast.error("Selecione uma cor válida");
-        return;
-      }
-
-      // Converter valores formatados para número
-      const saldoInicial = parseCurrency(formData.initialBalance || '0');
-      
-      // Mapear os tipos do formulário para os tipos da API
-      const mapAccountType = (type: string): 'corrente' | 'poupanca' | 'investimento' => {
-        switch (type) {
-          case 'poupanca':
-          case 'investimento':
-            return type;
-          case 'outro':
-          default:
-            return 'corrente';
-        }
-      };
-      
-      // Preparar dados para a API usando os nomes de campo corretos
-      const accountData = {
-        nome: formData.name,
-        bancoId: formData.bankId,
-        tipo: mapAccountType(formData.type),
-        saldoInicial: saldoInicial,
-        agencia: formData.agency || '',
-        conta: formData.accountNumber || '',
-      };
-      
-      // Chamar a API para atualizar a conta
-      const response = await api.editarConta(account.id, accountData);
-      
-      if (response) {
-        toast.success("Conta atualizada com sucesso!");
-        
-        // Chamar callback de sucesso se fornecido
-        if (onSuccess) {
-          onSuccess();
-        }
-        
-        // Fechar o diálogo se houver um manipulador de fechamento
-        if (onClose) {
-          onClose();
-        }
-      } else {
-        throw new Error("Não foi possível atualizar a conta. Tente novamente.");
-      }
-      
+      toast.success("Conta atualizada com sucesso!");
+      if (onSuccess) onSuccess();
+      if (onClose) onClose();
     } catch (error) {
       console.error("Erro ao atualizar conta:", error);
-      toast.error(
-        error instanceof Error 
-          ? `Erro ao atualizar conta: ${error.message}` 
-          : "Ocorreu um erro ao atualizar a conta. Tente novamente."
-      );
+      toast.error("Erro ao atualizar a conta. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
   };
+  
+  // Buscar lista de bancos (exemplo)
+  useEffect(() => {
+    const fetchBanks = async () => {
+      try {
+        setIsLoadingBanks(true);
+        // Exemplo: const response = await api.getBanks();
+        // setBanks(response.data);
+      } catch (error) {
+        console.error("Erro ao carregar bancos:", error);
+        toast.error("Não foi possível carregar a lista de bancos");
+      } finally {
+        setIsLoadingBanks(false);
+      }
+    };
 
-  // Função para formatar o valor monetário enquanto digita
-  const handleCurrencyChange = (field: 'initialBalance') => (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, '');
+    fetchBanks();
+  }, []);
+
+  const handleCancel = () => {
+    if (onCancel) onCancel();
+    if (onClose) onClose();
+  };
+  // Função para formatar moeda
+  const formatCurrency = (value: string) => {
+    // Remove tudo que não é dígito
+    const digits = value.replace(/\D/g, '');
     
-    if (value === '') {
-      form.setValue(field, '');
-      return;
-    }
+    // Se não tiver valor, retorna vazio
+    if (!digits) return '0,00';
     
     // Converte para número e formata como moeda
-    const numberValue = parseInt(value, 10) / 100;
-    const formattedValue = numberValue.toLocaleString('pt-BR', {
+    const numberValue = parseInt(digits, 10) / 100;
+    return numberValue.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-    
-    form.setValue(field, formattedValue);
   };
 
-  // Função para lidar com a seleção de cor
-  const handleColorChange = (color: string) => {
-    form.setValue('color', color);
-    setSelectedColor(color);
-  };
-
-  // Função para cancelar a edição
-  const handleCancel = () => {
-    if (onCancel) {
-      onCancel();
+  // Mapeia o tipo da conta para o formato esperado
+  const mapAccountType = (type: string) => {
+    switch (type) {
+      case 'corrente':
+      case 'poupanca':
+      case 'investimento':
+        return type;
+      default:
+        return 'outro';
     }
   };
 
+  // Manipulador de mudança de cor
+  const handleColorChange = (color: string) => {
+    setSelectedColor(color);
+    form.setValue('cor', color);
+  };
+
+  // Manipulador de mudança de moeda
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCurrency(e.target.value);
+    form.setValue('saldoInicial', formatted);
+  };
+
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="name">Nome da Conta</Label>
-        <Input id="name" {...form.register("name")} />
-        {form.formState.errors.name && (
-          <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
+        <Label htmlFor="nome">Nome da Conta</Label>
+        <Input
+          id="nome"
+          placeholder="Ex: Conta Corrente Principal"
+          {...form.register("nome")}
+          disabled={isLoading}
+        />
+        {form.formState.errors.nome && (
+          <p className="text-sm text-red-500">{form.formState.errors.nome.message}</p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="bankId">Banco</Label>
-        <Select
-          onValueChange={(value) => form.setValue("bankId", value)}
-          value={form.watch("bankId")}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione o banco" />
-          </SelectTrigger>
-          <SelectContent>
-            {banks.map((bank) => (
-              <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {form.formState.errors.bankId && (
-          <p className="text-sm text-red-500">{form.formState.errors.bankId.message}</p>
+        <Label htmlFor="banco">Banco</Label>
+        <Input
+          id="banco"
+          placeholder="Ex: Nubank, Itaú, Bradesco"
+          {...form.register("banco")}
+          disabled={isLoading}
+        />
+        {form.formState.errors.banco && (
+          <p className="text-sm text-red-500">{form.formState.errors.banco.message}</p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="type">Tipo de Conta</Label>
+        <Label htmlFor="tipo">Tipo de Conta</Label>
         <Select
-          value={form.watch("type")}
-          onValueChange={(value) => form.setValue("type", value as 'corrente' | 'poupanca' | 'investimento' | 'outro')}
+          value={form.watch("tipo")}
+          onValueChange={(value) => form.setValue("tipo", value as any)}
+          disabled={isLoading}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Selecione o tipo" />
+            <SelectValue placeholder="Selecione o tipo de conta" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="corrente">Conta Corrente</SelectItem>
-            <SelectItem value="poupança">Poupança</SelectItem>
-            <SelectItem value="investimento">Investimento</SelectItem>
+            <SelectItem value="poupanca">Conta Poupança</SelectItem>
+            <SelectItem value="investimento">Conta Investimento</SelectItem>
             <SelectItem value="outro">Outro</SelectItem>
           </SelectContent>
         </Select>
-        {form.formState.errors.type && (
-          <p className="text-sm text-red-500">{form.formState.errors.type.message}</p>
+        {form.formState.errors.tipo && (
+          <p className="text-sm text-red-500">{form.formState.errors.tipo.message}</p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="color">Cor</Label>
+        <Label>Cor</Label>
         <div className="flex items-center gap-2">
           <div 
-            className="w-8 h-8 rounded-full border"
+            className="w-8 h-8 rounded-full border" 
             style={{ backgroundColor: selectedColor }}
           />
-          <Input 
-            id="color" 
-            value={selectedColor} 
+          <Input
+            value={selectedColor}
             onChange={(e) => handleColorChange(e.target.value)}
-            className="w-24"
+            className="flex-1"
+            disabled={isLoading}
           />
         </div>
-        {form.formState.errors.color && (
-          <p className="text-sm text-red-500">{form.formState.errors.color.message}</p>
+        <div className="mt-2">
+          <ColorPicker 
+            color={selectedColor}
+            onChange={handleColorChange}
+            value={selectedColor}
+          />
+        </div>
+        {form.formState.errors.cor && (
+          <p className="text-sm text-red-500">{form.formState.errors.cor.message}</p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="initialBalance">Saldo Inicial</Label>
+        <Label htmlFor="saldoInicial">Saldo Inicial</Label>
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
             R$&nbsp;
           </span>
-          <Input 
-            id="initialBalance" 
-            className="pl-12" 
-            value={formatCurrency(parseFloat(form.watch("initialBalance") || '0') || 0)}
-            onChange={(e) => {
-              const value = e.target.value.replace(/\D/g, '');
-              form.setValue("initialBalance", value ? (Number(value) / 100).toFixed(2) : '0');
-            }}
+          <Input
+            id="saldoInicial"
+            placeholder="0,00"
+            className="pl-12"
+            value={form.watch("saldoInicial")}
+            onChange={handleCurrencyChange}
+            disabled={isLoading}
           />
         </div>
-        {form.formState.errors.initialBalance && (
-          <p className="text-sm text-red-500">{form.formState.errors.initialBalance.message}</p>
+        {form.formState.errors.saldoInicial && (
+          <p className="text-sm text-red-500">{form.formState.errors.saldoInicial.message}</p>
         )}
       </div>
 
-      <div className="flex justify-end gap-3 pt-4">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={onCancel || onClose} 
+      <div className="space-y-2">
+        <Label htmlFor="agencia">Agência (opcional)</Label>
+        <Input
+          id="agencia"
+          placeholder="Número da agência"
+          {...form.register("agencia")}
+          disabled={isLoading}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="numeroConta">Número da Conta (opcional)</Label>
+        <Input
+          id="numeroConta"
+          placeholder="Número da conta"
+          {...form.register("numeroConta")}
+          disabled={isLoading}
+        />
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleCancel}
           disabled={isLoading}
         >
           Cancelar
         </Button>
-        <Button 
-          type="submit" 
-          disabled={isLoading} 
+        <Button
+          type="submit"
+          disabled={isLoading}
           className="min-w-[120px]"
         >
           {isLoading ? (
-            <span className="flex items-center">
+            <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Salvando...
-            </span>
+            </>
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />

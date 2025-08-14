@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { accounts, banks } from "@/lib/db/schema";
+import { accounts, banks, users } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,58 +44,86 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = 1; // TODO: Pegar do contexto de autenticação
-    const body = await request.json();
+    // Verificar se existe um usuário, se não existir, criar um padrão
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, 1))
+      .get();
 
-    const { nome, tipo, bancoId, agencia, conta, saldoInicial } = body;
+    const userId = 1;
+
+    if (!existingUser) {
+      try {
+        // Criar um usuário padrão se não existir
+        await db.insert(users).values({
+          id: 1,
+          email: 'usuario@exemplo.com',
+          name: 'Usuário Padrão',
+          password: '$2b$10$examplehash', // Senha hash de exemplo
+          isActive: true,
+          createdAt: sql`(unixepoch())`,
+          updatedAt: sql`(unixepoch())`
+        });
+        console.log('Usuário padrão criado com sucesso');
+      } catch (error) {
+        console.error('Erro ao criar usuário padrão:', error);
+        return NextResponse.json(
+          { error: "Erro ao configurar o usuário padrão" },
+          { status: 500 }
+        );
+      }
+    }
+
+    const body = await request.json();
+    console.log('Dados recebidos na API de contas:', body);
+
+    const { nome, tipo, banco, agencia, conta, saldoInicial } = body;
 
     // Validações básicas
     if (!nome || !tipo) {
+      console.error('Validação falhou: nome ou tipo ausente', { nome, tipo });
       return NextResponse.json(
         { error: "Nome e tipo são obrigatórios" },
         { status: 400 }
       );
     }
 
-    // Buscar informações do banco se bancoId foi fornecido
-    let bankInfo = null;
-    if (bancoId) {
-      const bank = await db
-        .select()
-        .from(banks)
-        .where(eq(banks.id, parseInt(bancoId)))
-        .limit(1);
-      
-      if (bank.length > 0) {
-        bankInfo = bank[0];
-      }
-    }
+    // Criar um objeto com os valores padrão
+    const accountData: any = {
+      userId,
+      name: nome,
+      bank: banco || "Banco não informado",
+      type: tipo,
+      balance: saldoInicial ? Number(saldoInicial) : 0,
+      initialBalance: saldoInicial ? Number(saldoInicial) : 0,
+      color: "#3b82f6", // Cor padrão
+      isFavorite: false,
+      isActive: true,
+      description: `Conta ${tipo}`,
+      accountId: conta || null,
+      agency: agencia || null,
+    };
 
+    // Inserir a conta no banco de dados
     const newAccount = await db
       .insert(accounts)
-      .values({
-        userId,
-        name: nome,
-        bank: bankInfo?.name || "Banco não informado",
-        bankId: bancoId ? parseInt(bancoId) : null,
-        type: tipo,
-        balance: saldoInicial || 0,
-        initialBalance: saldoInicial || 0,
-        color: "#3b82f6", // Cor padrão
-        isFavorite: false,
-        isActive: true,
-        description: `Conta ${tipo}`,
-        bankCode: bankInfo?.code || null,
-        accountId: conta || null,
-        agency: agencia || null,
-      })
+      .values(accountData)
       .returning();
 
+    console.log('Conta criada com sucesso:', newAccount[0]);
     return NextResponse.json(newAccount[0], { status: 201 });
   } catch (error) {
-    console.error("Erro ao criar conta:", error);
+    console.error("Erro detalhado ao criar conta:", {
+      error: error,
+      message: error instanceof Error ? error.message : 'Erro desconhecido',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return NextResponse.json(
-      { error: "Erro interno do servidor" },
+      { 
+        error: "Erro interno do servidor",
+        details: error instanceof Error ? error.message : 'Erro desconhecido'
+      },
       { status: 500 }
     );
   }
