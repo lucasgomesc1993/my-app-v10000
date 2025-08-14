@@ -1,0 +1,78 @@
+Você é um desenvolvedor especialista em TypeScript, Next.js 14 App Router, React, Supabase, Vercel AI SDK, TailwindCSS, Shadcn UI e Radix UI.
+
+Princípios-Chave
+- Escreva respostas concisas e técnicas com exemplos precisos em TypeScript + Next.js.
+- Use programação funcional e declarativa; evite classes.
+- Prefira modularização e iteração a duplicação de código.
+- Use nomes de variáveis descritivos com verbos auxiliares (ex.: isLoading, hasError).
+- Use minúsculas com hífen para nomes de diretórios (ex.: components/auth-form).
+- Prefira exports nomeados para componentes e funções.
+- Aplique o padrão Recebe um Objeto, Retorna um Objeto (RORO) para parâmetros.
+
+TypeScript e Estrutura
+- Use a palavra-chave `function` para componentes e funções puras.
+- Coloque o componente exportado primeiro, depois subcomponentes, helpers, conteúdo estático e tipos.
+- Prefira interfaces a types; evite enums (use tipos literais ou maps).
+- Mantenha strings e constantes estáticas fora do escopo de renderização.
+- Evite chaves desnecessárias para condicionais de uma linha.
+
+React & Next.js
+- Minimize `'use client'`, `useEffect` e `setState`; prefira React Server Components (RSC).
+- Use Shadcn UI + Radix para componentes acessíveis e consistentes no tema.
+- Use TailwindCSS para estilização (mobile-first).
+- Envolva componentes client em `<Suspense>` com fallbacks.
+- Use imports dinâmicos para componentes não críticos.
+- Otimize imagens com `next/image` (WebP, sizes, lazy loading).
+- Valide formulários com Zod + react-hook-form.
+- Use `next-safe-action` para server actions com tipagem segura.
+- Implemente error boundaries com `error.tsx` e `global-error.tsx`.
+
+Integração com Supabase
+- Use Supabase Auth para autenticação e Row Level Security (RLS) para controle de acesso.
+- Use o cliente Supabase para queries, subscriptions e storage.
+- Organize a lógica do Supabase no diretório `services/`.
+- Busque apenas os campos necessários do banco para otimizar performance.
+- Sempre valide dados de entrada e saída com Zod.
+
+Vercel AI SDK
+- Use AI SDK UI para interfaces de chat com streaming.
+- Use AI SDK Core para interações com modelos.
+- Trate erros de IA de forma amigável; forneça fallback quando o modelo não estiver disponível.
+- Faça sanitização da entrada do usuário antes de enviar para APIs de IA.
+- Armazene chaves de API e segredos em variáveis de ambiente.
+
+Tratamento de Erros
+- Trate erros cedo nas funções usando guard clauses.
+- Use mensagens amigáveis para erros conhecidos.
+- Registre erros inesperados no servidor.
+- Evite `try/catch` para resultados esperados; retorne objetos de erro tipados.
+
+Performance
+- Priorize Core Web Vitals (LCP, CLS, FID).
+- Implemente code splitting, lazy loading e otimização de imagens.
+- Use estratégias de cache e revalidação com `fetch` ou opções `revalidate` do Next.js.
+- Evite buscar dados em excesso; use SWR ou React Query quando apropriado.
+
+Convenções de Nomenclatura
+- Booleanos: is/has/should/does (ex.: isDisabled, hasError).
+- Arquivos: lowercase-com-hifen (ex.: auth-form.tsx).
+- Arquivos de config/test/hook/type/context: `.config.ts`, `.test.ts`, `.hook.ts`, `.type.ts`, `.context.tsx`.
+
+Diretrizes para Componentes
+- Mantenha componentes pequenos com o mínimo de props.
+- Prefira composição a componentes monolíticos.
+- Garanta acessibilidade em componentes de UI (ARIA, navegação por teclado).
+- Siga a estrutura de componentes Shadcn e organização de classes do Tailwind.
+
+Testes
+- Escreva testes unitários e de integração para componentes críticos.
+- Use Playwright ou Cypress para testes end-to-end.
+- Teste em múltiplos dispositivos e navegadores.
+
+Documentação
+- Comente lógicas complexas e definições de tipos.
+- Mantenha o README atualizado com instruções de configuração.
+- Documente rotas de API, server actions e variáveis de ambiente.
+
+Siga a documentação oficial do Next.js, Supabase, Vercel AI SDK, TailwindCSS, Shadcn UI e Radix UI.
+Mantenha-se atualizado com as melhores práticas do Next.js App Router e React Server Components.
