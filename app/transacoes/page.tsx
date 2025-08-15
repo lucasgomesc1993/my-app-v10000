@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { RiAddLine, RiDownloadLine, RiUploadLine } from "@remixicon/react"
+import { RiDownloadLine, RiUploadLine } from "@remixicon/react"
 import { ColumnFiltersState, SortingState, PaginationState } from "@tanstack/react-table"
 
 import { PageLayout } from "@/components/layout/page-layout"
 import { Button } from "@/components/button"
 import { Card, CardContent } from "@/components/card"
-import { TransactionDialog } from "@/components/dialogs/transaction-dialog"
 import { DataTable } from "@/components/data-table/data-table"
+import { ActionButtons } from "@/components/action-buttons"
 import { columns } from "./columns"
 import { api } from "@/services/api"
 import { Transacao, TipoTransacao } from "@/types"
@@ -20,8 +20,6 @@ export default function TransacoesPage() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([])
   const [total, setTotal] = useState(0)
   const [pageCount, setPageCount] = useState(0)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedTransaction, setSelectedTransaction] = useState<Transacao | null>(null)
 
   const [sorting, setSorting] = useState<SortingState>([{ id: "data", desc: true }])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -67,28 +65,6 @@ export default function TransacoesPage() {
     carregarTransacoes()
   }, [pagination, sorting, columnFilters])
 
-  const handleNovaTransacao = () => {
-    setSelectedTransaction(null)
-    setIsDialogOpen(true)
-  }
-
-  const handleSaveTransaction = async (data: any) => {
-    try {
-      if (selectedTransaction) {
-        // Editar transação existente
-        await api.atualizarTransacao(selectedTransaction.id, data)
-      } else {
-        // Criar nova transação
-        await api.criarTransacao(data)
-      }
-      setIsDialogOpen(false)
-      carregarTransacoes() // Recarregar lista após operação
-    } catch (error) {
-      console.error('Erro ao salvar transação:', error)
-      // TODO: Mostrar toast de erro
-    }
-  }
-
   const setTipoFilter = (tipo?: TipoTransacao) => {
     setColumnFilters(prev => {
       const otherFilters = prev.filter(f => f.id !== 'tipo');
@@ -101,12 +77,7 @@ export default function TransacoesPage() {
   return (
     <PageLayout
       title="Transações"
-      actionButtons={
-        <Button onClick={handleNovaTransacao} className="gap-2">
-          <RiAddLine className="h-4 w-4" />
-          Nova Transação
-        </Button>
-      }
+      actionButtons={<ActionButtons />}
     >
       <div className="grid gap-6">
         <div className="flex flex-wrap gap-2">
@@ -130,32 +101,25 @@ export default function TransacoesPage() {
               columns={columns}
               data={transacoes}
               loading={isLoading}
-                onSortingChange={setSorting}
-                onColumnFiltersChange={setColumnFilters}
-                onPaginationChange={setPagination}
-                pageCount={pageCount}
-                rowCount={total}
-                state={{
-                  sorting,
-                  columnFilters,
-                  pagination,
-                }}
-                manualPagination
-                manualSorting
-                manualFiltering
-                searchKey="descricao"
-                searchPlaceholder="Filtrar por descrição..."
-              />
+              onSortingChange={setSorting}
+              onColumnFiltersChange={setColumnFilters}
+              onPaginationChange={setPagination}
+              pageCount={pageCount}
+              rowCount={total}
+              state={{
+                sorting,
+                columnFilters,
+                pagination,
+              }}
+              manualPagination
+              manualSorting
+              manualFiltering
+              searchKey="descricao"
+              searchPlaceholder="Filtrar por descrição..."
+            />
           </CardContent>
         </Card>
       </div>
-
-      <TransactionDialog
-        transaction={selectedTransaction || undefined}
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onSave={handleSaveTransaction}
-      />
     </PageLayout>
   )
 }

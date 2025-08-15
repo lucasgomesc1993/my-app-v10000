@@ -27,11 +27,14 @@ type CriarTransacaoData = {
 
 export type CriarContaData = {
   nome: string
-  tipo: 'corrente' | 'poupanca' | 'investimento'
-  bancoId: string
+  tipo: 'corrente' | 'poupança' | 'investimento' | 'outro'
+  banco: string
+  bancoId: string | number
   agencia?: string
   conta?: string
   saldoInicial?: number
+  saldo?: number
+  cor?: string
 }
 
 type CriarCategoriaData = {
@@ -201,28 +204,67 @@ export const api = {
     }
   },
 
-  async criarConta(data: CriarContaData): Promise<any> {
+  async criarConta(data: any): Promise<any> {
     try {
-      console.log('Dados enviados para criar conta:', data);
+      console.log('Dados recebidos para criar conta:', data);
+      
+      // Mapear os dados do formulário para o formato esperado pela API
+      const tipoConta = data.tipo === 'poupança' ? 'poupança' : 
+                       data.tipo === 'investimento' ? 'investimento' : 'corrente';
+      
+      // Primeiro, verificar se já existe um banco com o nome fornecido
+      const bancos = await this.buscarBancos();
+      let bancoId = 1; // Valor padrão como número
+      
+      const bancoExistente = bancos.find(b => b.name.toLowerCase() === (data.banco || '').toLowerCase());
+      if (bancoExistente) {
+        bancoId = Number(bancoExistente.id); // Garantir que é um número
+      } else if (data.banco) {
+        // Se não existir, criar um novo banco
+        try {
+          const novoBanco = await this.criarBanco({ name: data.banco });
+          bancoId = Number(novoBanco.id); // Garantir que é um número
+        } catch (error) {
+          console.error('Erro ao criar banco:', error);
+          // Continuar com o valor padrão em caso de erro
+        }
+      }
+      
+      const contaData = {
+        nome: data.nome || data.name,
+        tipo: tipoConta,
+        bancoId: bancoId,
+        saldoInicial: data.saldo || data.saldoInicial || 0,
+        banco: data.banco || data.bancoName || 'Banco não informado',
+        cor: data.cor || '#3b82f6',
+        conta: data.conta || '',
+        agencia: data.agencia || ''
+      };
+      
+      console.log('Dados processados para criar conta:', contaData);
       
       const response = await fetch('/api/accounts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
-      })
+        body: JSON.stringify(contaData),
+      });
 
       console.log('Response status:', response.status);
       
       if (!response.ok) {
         const errorData = await response.text();
         console.error('Erro na resposta da API:', errorData);
-        throw new Error(`Erro ao criar conta: ${response.status} - ${errorData}`)
+        throw new Error(`Erro ao criar conta: ${response.status} - ${errorData}`);
       }
 
       const result = await response.json();
       console.log('Conta criada com sucesso:', result);
+      
+      // Disparar evento personalizado para notificar sobre a nova conta
+      window.dispatchEvent(new CustomEvent('conta-criada', { detail: result }));
+      
       return result;
     } catch (error) {
       console.error('Erro ao criar conta:', error)
@@ -545,22 +587,36 @@ export const api = {
 
   async pagarFatura(invoiceId: number, paymentData: any): Promise<any> {
     try {
-      const response = await fetch(`/api/invoices/${invoiceId}/pay`, {
+      const response = await fetch(`/api/transactions/pay-invoice/${invoiceId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(paymentData),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error('Erro ao pagar fatura')
+        throw new Error('Erro ao processar pagamento da fatura');
       }
 
-      return await response.json()
+      return await response.json();
     } catch (error) {
-      console.error('Erro ao pagar fatura:', error)
-      throw error
+      console.error('Erro ao processar pagamento da fatura:', error);
+      throw error;
+    }
+  },
+
+  async countTransactionsByCategory(categoryId: string): Promise<number> {
+    try {
+      const response = await fetch(`/api/categories/${categoryId}/transactions/count`);
+      if (!response.ok) {
+        throw new Error('Erro ao buscar contagem de transações por categoria');
+      }
+      const data = await response.json();
+      return data.count || 0;
+    } catch (error) {
+      console.error('Erro ao contar transações por categoria:', error);
+      throw error;
     }
   },
 }

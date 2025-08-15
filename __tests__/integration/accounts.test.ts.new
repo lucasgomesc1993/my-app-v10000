@@ -1,0 +1,328 @@
+import { describe, beforeAll, afterAll, beforeEach, test, expect } from '@jest/globals';
+import { createTestDatabase, clearDatabase, closeDatabase } from '../test-utils';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../../lib/db/schema';
+import { eq } from 'drizzle-orm';
+
+type Account = typeof schema.accounts.$inferSelect;
+type NewAccount = typeof schema.accounts.$inferInsert;
+
+describe('Bank Account CRUD Operations', () => {
+  let dbClient: ReturnType<typeof drizzle<typeof schema>>;
+
+  beforeAll(async () => {
+    // Configura o banco de dados de teste
+    dbClient = createTestDatabase();
+    
+    // Cria as tabelas necessárias
+    await dbClient.run(sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        name TEXT NOT NULL,
+        created_at INTEGER DEFAULT (unixepoch())
+      );
+      
+      CREATE TABLE IF NOT EXISTS banks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        created_at INTEGER DEFAULT (unixepoch())
+      );
+    `);
+    
+    // Insere dados de teste
+    await dbClient.run(sql`
+      INSERT INTO users (email, password, name) VALUES ('test@example.com', 'hashedpassword', 'Test User');
+      INSERT INTO banks (code, name, full_name) VALUES ('001', 'Banco do Brasil', 'Banco do Brasil S.A.');
+    `);
+  });
+
+  afterAll(async () => {
+    // Fecha a conexão com o banco de dados
+    await closeDatabase();
+  });
+
+  beforeEach(async () => {
+    // Limpa os dados antes de cada teste
+    await clearDatabase();
+  });
+
+  test('should create a new account', async () => {
+    // Dados da conta de teste
+    const accountData: Omit<NewAccount, 'createdAt' | 'updatedAt'> = {
+      name: 'Conta Corrente',
+      bank: 'Banco Teste',
+      type: 'corrente',
+      color: '#3b82f6',
+      initialBalance: 1000.50,
+      balance: 1000.50,
+      userId: 1,
+      bankId: 1,
+      accountNumber: '12345-6',
+      accountDigit: null,
+      agency: '0001',
+      agencyDigit: null,
+      bankCode: '001',
+      branchId: null,
+      accountId: null,
+      ofxAccountType: 'CHECKING',
+      ofxBankId: null,
+      ofxBranchId: null,
+      ofxAccountId: null,
+      ofxKey: null,
+      ofxUrl: null,
+      ofxVersion: '102',
+      description: 'Conta principal',
+      notes: null,
+      lastSyncAt: null,
+      syncEnabled: false,
+      isActive: true,
+      isFavorite: false,
+      subtype: null,
+      creditLimit: 0
+    };
+
+    // Insere a conta no banco de dados
+    const insertResult = await dbClient.insert(schema.accounts).values(accountData).run();
+    const accountId = Number(insertResult.lastInsertRowid);
+    
+    // Busca a conta inserida para verificação
+    const [savedAccount] = await dbClient
+      .select()
+      .from(schema.accounts)
+      .where(eq(schema.accounts.id, accountId));
+      
+    // Verifica se a conta foi criada corretamente
+    expect(savedAccount).toBeDefined();
+    expect(savedAccount.name).toBe(accountData.name);
+    expect(savedAccount.type).toBe(accountData.type);
+    expect(savedAccount.balance).toBe(accountData.balance);
+    expect(savedAccount.userId).toBe(accountData.userId);
+    expect(savedAccount.bankId).toBe(accountData.bankId);
+  });
+
+  test('should update an existing account', async () => {
+    // Primeiro, cria uma conta para testar a atualização
+    const accountData: Omit<NewAccount, 'createdAt' | 'updatedAt'> = {
+      name: 'Conta Corrente',
+      bank: 'Banco Teste',
+      type: 'corrente',
+      color: '#3b82f6',
+      initialBalance: 1000.00,
+      balance: 1000.00,
+      userId: 1,
+      bankId: 1,
+      accountNumber: '12345-6',
+      accountDigit: null,
+      agency: '0001',
+      agencyDigit: null,
+      bankCode: '001',
+      branchId: null,
+      accountId: null,
+      ofxAccountType: 'CHECKING',
+      ofxBankId: null,
+      ofxBranchId: null,
+      ofxAccountId: null,
+      ofxKey: null,
+      ofxUrl: null,
+      ofxVersion: '102',
+      description: 'Conta corrente',
+      notes: null,
+      lastSyncAt: null,
+      syncEnabled: false,
+      isActive: true,
+      isFavorite: false,
+      subtype: null,
+      creditLimit: 0
+    };
+
+    // Insere a conta no banco de dados
+    const insertResult = await dbClient.insert(schema.accounts).values(accountData).run();
+    const accountId = Number(insertResult.lastInsertRowid);
+
+    // Dados para atualização
+    const updateData = {
+      name: 'Conta Corrente Atualizada',
+      balance: 1500.00,
+      isFavorite: true
+    };
+
+    // Atualiza a conta
+    await dbClient
+      .update(schema.accounts)
+      .set(updateData)
+      .where(eq(schema.accounts.id, accountId))
+      .run();
+
+    // Busca a conta atualizada
+    const [updatedAccount] = await dbClient
+      .select()
+      .from(schema.accounts)
+      .where(eq(schema.accounts.id, accountId));
+
+    // Verifica se os dados foram atualizados corretamente
+    expect(updatedAccount).toBeDefined();
+    expect(updatedAccount.name).toBe(updateData.name);
+    expect(updatedAccount.balance).toBe(updateData.balance);
+    expect(updatedAccount.isFavorite).toBe(updateData.isFavorite);
+  });
+
+  test('should delete an existing account', async () => {
+    // Primeiro, cria uma conta para testar a exclusão
+    const accountData: Omit<NewAccount, 'createdAt' | 'updatedAt'> = {
+      name: 'Conta para Excluir',
+      bank: 'Banco Teste',
+      type: 'corrente',
+      color: '#ef4444',
+      initialBalance: 500.00,
+      balance: 500.00,
+      userId: 1,
+      bankId: 1,
+      accountNumber: '12345-6',
+      accountDigit: null,
+      agency: '0001',
+      agencyDigit: null,
+      bankCode: '001',
+      branchId: null,
+      accountId: null,
+      ofxAccountType: 'CHECKING',
+      ofxBankId: null,
+      ofxBranchId: null,
+      ofxAccountId: null,
+      ofxKey: null,
+      ofxUrl: null,
+      ofxVersion: '102',
+      description: 'Conta para exclusão',
+      notes: null,
+      lastSyncAt: null,
+      syncEnabled: false,
+      isActive: true,
+      isFavorite: false,
+      subtype: null,
+      creditLimit: 0
+    };
+
+    // Insere a conta no banco de dados
+    const insertResult = await dbClient.insert(schema.accounts).values(accountData).run();
+    const accountId = Number(insertResult.lastInsertRowid);
+
+    // Exclui a conta
+    await dbClient
+      .delete(schema.accounts)
+      .where(eq(schema.accounts.id, accountId))
+      .run();
+
+    // Tenta buscar a conta excluída
+    const [deletedAccount] = await dbClient
+      .select()
+      .from(schema.accounts)
+      .where(eq(schema.accounts.id, accountId));
+
+    // Verifica se a conta foi excluída
+    expect(deletedAccount).toBeUndefined();
+  });
+
+  test('should list all accounts for a user', async () => {
+    // Cria várias contas para o mesmo usuário
+    const testAccounts: Array<Omit<NewAccount, 'createdAt' | 'updatedAt'>> = [
+      {
+        name: 'Conta Corrente',
+        bank: 'Banco Teste',
+        type: 'corrente',
+        color: '#3b82f6',
+        initialBalance: 1000.00,
+        balance: 1000.00,
+        userId: 1,
+        bankId: 1,
+        isActive: true,
+        isFavorite: false,
+        accountNumber: '12345-6',
+        agency: '0001',
+        bankCode: '001',
+        ofxAccountType: 'CHECKING',
+        ofxVersion: '102',
+        description: 'Conta corrente',
+        notes: null,
+        lastSyncAt: null,
+        syncEnabled: false,
+        subtype: null,
+        creditLimit: 0,
+        accountDigit: null,
+        agencyDigit: null,
+        branchId: null,
+        accountId: null,
+        ofxBankId: null,
+        ofxBranchId: null,
+        ofxAccountId: null,
+        ofxKey: null,
+        ofxUrl: null
+      },
+      {
+        name: 'Conta Poupança',
+        bank: 'Banco Teste',
+        type: 'poupança',
+        color: '#10b981',
+        initialBalance: 5000.00,
+        balance: 5000.00,
+        userId: 1,
+        bankId: 1,
+        isActive: true,
+        isFavorite: false,
+        accountNumber: '12345-7',
+        agency: '0001',
+        bankCode: '001',
+        ofxAccountType: 'SAVINGS',
+        ofxVersion: '102',
+        description: 'Conta poupança',
+        notes: null,
+        lastSyncAt: null,
+        syncEnabled: false,
+        subtype: null,
+        creditLimit: 0,
+        accountDigit: null,
+        agencyDigit: null,
+        branchId: null,
+        accountId: null,
+        ofxBankId: null,
+        ofxBranchId: null,
+        ofxAccountId: null,
+        ofxKey: null,
+        ofxUrl: null
+      }
+    ];
+
+    // Insere as contas de teste
+    for (const account of testAccounts) {
+      await dbClient.insert(schema.accounts).values(account).run();
+    }
+
+    // Busca todas as contas do usuário
+    const userAccounts = await dbClient
+      .select()
+      .from(schema.accounts)
+      .where(eq(schema.accounts.userId, 1));
+
+    // Verifica se todas as contas foram retornadas
+    expect(userAccounts.length).toBeGreaterThanOrEqual(testAccounts.length);
+    
+    // Verifica se os dados estão corretos
+    const savedAccounts = userAccounts.filter(acc => 
+      testAccounts.some(testAcc => testAcc.name === acc.name)
+    );
+    
+    expect(savedAccounts.length).toBe(testAccounts.length);
+    
+    // Verifica cada conta
+    testAccounts.forEach(testAccount => {
+      const savedAccount = savedAccounts.find(acc => acc.name === testAccount.name);
+      expect(savedAccount).toBeDefined();
+      if (savedAccount) {
+        expect(savedAccount.type).toBe(testAccount.type);
+        expect(savedAccount.balance).toBe(testAccount.initialBalance);
+      }
+    });
+  });
+});

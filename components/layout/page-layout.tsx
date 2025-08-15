@@ -18,7 +18,7 @@ export function PageLayout({
   className = "",
 }: PageLayoutProps) {
   return (
-    <div className={cn("flex flex-col h-full", className)}>
+    <div className={cn("flex flex-col h-full", className)} suppressHydrationWarning>
       {/* Header com Título e Botões de Ação */}
       <header className="w-full border-b">
         <div className="flex items-center justify-between min-h-20 py-4 px-4 md:px-6 lg:px-8 mx-auto w-full max-w-6xl">

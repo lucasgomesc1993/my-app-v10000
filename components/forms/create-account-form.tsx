@@ -85,28 +85,39 @@ export function CreateAccountForm({
     try {
       setIsLoading(true);
       
+      // Converter o valor do saldo para número
       const saldoInicial = parseFloat(
         data.saldoInicial.replace(/[^0-9,-]+/g, "").replace(",", ".")
       );
 
+      // Criar objeto com os dados da conta
       const contaData = {
         nome: data.nome,
         banco: data.banco,
         tipo: data.tipo as 'corrente' | 'poupança' | 'investimento' | 'outro',
         cor: data.cor,
         saldo: saldoInicial,
+        saldoInicial: saldoInicial,
+        conta: '',
+        agencia: ''
       };
 
+      console.log('Dados da conta a serem enviados:', contaData);
+
+      // Chamar a função de callback fornecida (normalmente do componente pai)
       if (onSubmit) {
         await onSubmit(contaData);
       }
 
+      // Mostrar mensagem de sucesso
       toast.success("Conta criada com sucesso!");
       
+      // Chamar callback de sucesso (normalmente para fechar o diálogo)
       if (onSuccess) {
         onSuccess();
       }
       
+      // Resetar o formulário
       form.reset({
         nome: "",
         banco: "",
@@ -117,7 +128,12 @@ export function CreateAccountForm({
       
     } catch (error) {
       console.error("Erro ao criar conta:", error);
-      toast.error("Erro ao criar a conta. Tente novamente.");
+      // Mostrar mensagem de erro detalhada
+      toast.error(
+        error instanceof Error 
+          ? `Erro ao criar conta: ${error.message}`
+          : "Ocorreu um erro ao criar a conta. Tente novamente."
+      );
     } finally {
       setIsLoading(false);
     }

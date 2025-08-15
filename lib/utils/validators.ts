@@ -161,3 +161,20 @@ export type AccountFormData = z.infer<typeof accountSchema>;
 export type CreditCardFormData = z.infer<typeof creditCardSchema>;
 export type CategoryFormData = z.infer<typeof categorySchema>;
 export type TransactionFormData = z.infer<typeof transactionSchema>;
+
+// Categoria
+export const categoryFormSchema = z.object({
+  nome: z.string().min(2, {
+    message: "O nome da categoria deve ter pelo menos 2 caracteres.",
+  }),
+  tipo: z.enum(["receita", "despesa"]),
+  cor: z.string().regex(/^#[0-9a-fA-F]{6}$/, {
+    message: "Cor inválida.",
+  }),
+  icone: z.string().min(1, {
+    message: "Por favor, selecione um ícone.",
+  }),
+  descricao: z.string().optional(),
+});
+
+export type CategoryFormSchema = z.infer<typeof categoryFormSchema>;

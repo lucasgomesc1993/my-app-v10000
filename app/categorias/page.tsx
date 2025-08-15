@@ -7,7 +7,7 @@ import { Categoria, TipoTransacao } from "@/types";
 import { CreateCategoryDialog } from "@/components/dialogs/create-category-dialog";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/badge";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Plus, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/button";
 import { toast } from "sonner";
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/services/api";
 import { AddCategoryButton } from "@/components/add-category-button";
+import { DeleteCategoryDialog } from "@/components/dialogs/delete-category-dialog";
 
 // Mapeamento de ícones para cada tipo de transação
 const iconesPorTipo: Record<string, string> = {
@@ -71,6 +72,7 @@ export default function CategoriasPage() {
   }, []);
 
   const [categoriaParaEditar, setCategoriaParaEditar] = useState<Categoria | null>(null);
+  const [categoriaParaExcluir, setCategoriaParaExcluir] = useState<Categoria | null>(null);
   const [dialogAberto, setDialogAberto] = useState(false);
 
   const handleEditarCategoria = (categoria: Categoria, e: React.MouseEvent) => {
@@ -89,20 +91,13 @@ export default function CategoriasPage() {
     handleFecharDialog();
   };
 
-  const handleExcluirCategoria = async (categoria: Categoria, e: React.MouseEvent) => {
+  const handleExcluirCategoria = (categoria: Categoria, e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    if (confirm(`Tem certeza que deseja excluir a categoria "${categoria.nome}"?`)) {
-      try {
-        // Garante que o ID seja uma string
-        await api.excluirCategoria(String(categoria.id));
-        toast.success("Categoria excluída com sucesso!");
-        carregarCategorias(); // Recarregar lista após exclusão
-      } catch (error) {
-        console.error("Erro ao excluir categoria:", error);
-        toast.error("Erro ao excluir categoria");
-      }
-    }
+    setCategoriaParaExcluir(categoria);
+  };
+
+  const handleFecharDialogExclusao = () => {
+    setCategoriaParaExcluir(null);
   };
 
   // Função para obter o componente do ícone dinamicamente
@@ -224,7 +219,7 @@ export default function CategoriasPage() {
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={(e) => handleExcluirCategoria(categoria, e)}
-                                className="text-destructive focus:text-destructive cursor-pointer"
+                                className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 <span>Excluir</span>
@@ -237,6 +232,19 @@ export default function CategoriasPage() {
                   );
                 })}
       </div>
+
+      {/* Diálogo de Exclusão */}
+      {categoriaParaExcluir && (
+        <DeleteCategoryDialog
+          open={!!categoriaParaExcluir}
+          onOpenChange={(open) => !open && setCategoriaParaExcluir(null)}
+          category={{
+            id: String(categoriaParaExcluir.id),
+            name: categoriaParaExcluir.nome || 'Sem nome'
+          }}
+          onSuccess={carregarCategorias}
+        />
+      )}
     </PageLayout>
   );
 }

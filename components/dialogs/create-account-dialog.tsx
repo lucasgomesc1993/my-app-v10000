@@ -12,10 +12,18 @@ import {
 } from "@/components/ui/dialog";
 import { CreateAccountForm } from "@/components/forms/create-account-form";
 
-import { CriarContaData } from "@/services/api";
+type ContaBancaria = {
+  id: string;
+  nome: string;
+  banco: string;
+  tipo: 'corrente' | 'poupança' | 'investimento' | 'outro';
+  cor: string;
+  saldo: number;
+  favorita: boolean;
+};
 
 type CreateAccountDialogProps = {
-  onAccountCreated?: (conta: CriarContaData & { cor: string }) => void;
+  onAccountCreated?: (conta: Omit<ContaBancaria, 'id' | 'favorita'>) => void;
   children?: React.ReactNode;
 };
 

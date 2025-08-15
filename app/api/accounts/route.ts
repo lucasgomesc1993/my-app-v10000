@@ -78,31 +78,39 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('Dados recebidos na API de contas:', body);
 
-    const { nome, tipo, banco, agencia, conta, saldoInicial } = body;
+    // Mapear os campos do formulário para o formato esperado
+    const nomeConta = body.nome || body.name;
+    const tipoConta = body.tipo === 'poupança' ? 'poupança' : 
+                     body.tipo === 'investimento' ? 'investimento' : 'corrente';
+    const nomeBanco = body.banco || body.bank || 'Banco não informado';
+    const saldo = body.saldo || body.saldoInicial || 0;
+    const corConta = body.cor || '#3b82f6';
+    
+    console.log('Dados processados na API:', { nomeConta, tipoConta, nomeBanco, saldo, corConta });
 
     // Validações básicas
-    if (!nome || !tipo) {
-      console.error('Validação falhou: nome ou tipo ausente', { nome, tipo });
+    if (!nomeConta) {
+      console.error('Validação falhou: nome da conta ausente', body);
       return NextResponse.json(
-        { error: "Nome e tipo são obrigatórios" },
+        { error: "O nome da conta é obrigatório" },
         { status: 400 }
       );
     }
 
-    // Criar um objeto com os valores padrão
+    // Criar um objeto com os valores
     const accountData: any = {
       userId,
-      name: nome,
-      bank: banco || "Banco não informado",
-      type: tipo,
-      balance: saldoInicial ? Number(saldoInicial) : 0,
-      initialBalance: saldoInicial ? Number(saldoInicial) : 0,
-      color: "#3b82f6", // Cor padrão
+      name: nomeConta,
+      bank: nomeBanco,
+      type: tipoConta,
+      balance: Number(saldo) || 0,
+      initialBalance: Number(saldo) || 0,
+      color: corConta,
       isFavorite: false,
       isActive: true,
-      description: `Conta ${tipo}`,
-      accountId: conta || null,
-      agency: agencia || null,
+      description: `Conta ${tipoConta}`,
+      accountNumber: body.conta || '',
+      agency: body.agencia || '',
     };
 
     // Inserir a conta no banco de dados
